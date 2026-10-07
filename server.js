@@ -320,4 +320,9 @@ if (require.main === module) {
 }
 
 // Export for testing
-module.exports = { app, calculateRequirements, ACTIVITY_MULTIPLIER, VALID_PET_TYPES, validatePetInput };
+// Export app สำหรับ Vercel และ Unit Testing
+module.exports = app;
+module.exports.calculateRequirements = calculateRequirements;
+module.exports.ACTIVITY_MULTIPLIER = ACTIVITY_MULTIPLIER;
+module.exports.VALID_PET_TYPES = VALID_PET_TYPES;
+module.exports.validatePetInput = validatePetInput;
