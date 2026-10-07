@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || './data/pets.db';
 const VALID_PET_TYPES = ['dog', 'cat', 'bird', 'rabbit', 'hamster', 'fish', 'mouse'];
 const AI_API_KEY = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'gemini-2.0-flash';
+const AI_MODEL = process.env.AI_MODEL || process.env.AI_MODELS || 'gemini-2.0-flash';
 
 // =============================================
 // Middleware
@@ -206,9 +206,9 @@ app.post('/api/calculate', (req, res) => {
  * GET /api/pets
  * Retrieve all pet records
  */
-app.get('/api/pets', (req, res) => {
+app.get('/api/pets', async (req, res) => {
   try {
-    const pets = getAllPets();
+    const pets = await getAllPets();
     res.json({
       success: true,
       data: pets
@@ -223,7 +223,7 @@ app.get('/api/pets', (req, res) => {
  * POST /api/pets
  * Save a new pet with calculated requirements
  */
-app.post('/api/pets', (req, res) => {
+app.post('/api/pets', async (req, res) => {
   const errors = validatePetInput(req.body);
 
   if (errors.length > 0) {
@@ -249,7 +249,7 @@ app.post('/api/pets', (req, res) => {
       food_g
     };
 
-    addPet(pet);
+    await addPet(pet);
     console.log(`✅ Pet added: ${pet.name} (${pet.type}) — Water: ${water_ml}ml, Food: ${food_g}g`);
 
     res.status(201).json({
@@ -266,12 +266,12 @@ app.post('/api/pets', (req, res) => {
  * DELETE /api/pets/:id
  * Delete a pet record by ID
  */
-app.delete('/api/pets/:id', (req, res) => {
+app.delete('/api/pets/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = deletePet(id);
+    const result = await deletePet(id);
 
-    if (result.changes === 0) {
+    if ((result.changes || 0) === 0) {
       return res.status(404).json({
         success: false,
         error: 'Pet not found'
@@ -293,9 +293,9 @@ app.delete('/api/pets/:id', (req, res) => {
  * GET /api/summary
  * Get summary statistics
  */
-app.get('/api/summary', (req, res) => {
+app.get('/api/summary', async (req, res) => {
   try {
-    const summary = getSummary();
+    const summary = await getSummary();
     res.json({
       success: true,
       data: summary
@@ -321,8 +321,10 @@ if (require.main === module) {
 
 // Export for testing
 // Export app สำหรับ Vercel และ Unit Testing
-module.exports = app;
-module.exports.calculateRequirements = calculateRequirements;
-module.exports.ACTIVITY_MULTIPLIER = ACTIVITY_MULTIPLIER;
-module.exports.VALID_PET_TYPES = VALID_PET_TYPES;
-module.exports.validatePetInput = validatePetInput;
+module.exports = {
+  app,
+  calculateRequirements,
+  ACTIVITY_MULTIPLIER,
+  VALID_PET_TYPES,
+  validatePetInput
+};

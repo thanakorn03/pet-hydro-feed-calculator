@@ -1,73 +1,137 @@
 // =============================================
-// db.js — SQLite Database Helper
+// db.js — Database helper with SQLite fallback and Turso Cloud support
 // Pet Hydro-Feed Calculator
 // =============================================
 
 const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 const path = require('path');
 const fs = require('fs');
 
-let db;
+let db = null;
+let tursoClient = null;
+
+function isTursoEnabled() {
+  const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.TURSO_URL || '';
+  const tursoToken = process.env.TURSO_AUTH_TOKEN || process.env.TURSO_API_TOKEN || '';
+  return Boolean(tursoUrl && tursoToken && (/^libsql:\/\//i.test(tursoUrl) || /^https?:\/\//i.test(tursoUrl)));
+}
+
+function getTursoClient() {
+  if (!isTursoEnabled()) {
+    return null;
+  }
+
+  if (!tursoClient) {
+    tursoClient = createClient({
+      url: process.env.TURSO_DATABASE_URL || process.env.TURSO_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN || process.env.TURSO_API_TOKEN
+    });
+  }
+
+  return tursoClient;
+}
+
+async function ensurePetsTable() {
+  if (!isTursoEnabled()) {
+    return;
+  }
+
+  const client = getTursoClient();
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS pets (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      breed TEXT DEFAULT '',
+      weight REAL NOT NULL,
+      activity TEXT NOT NULL,
+      water_ml REAL NOT NULL,
+      food_g REAL NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const columns = await client.execute("PRAGMA table_info('pets')");
+  const hasBreedColumn = (columns.rows || []).some((column) => column.name === 'breed');
+
+  if (!hasBreedColumn) {
+    await client.execute("ALTER TABLE pets ADD COLUMN breed TEXT DEFAULT ''");
+  }
+}
 
 /**
  * Initialize SQLite database and create tables if not exist
  * @param {string} dbPath - Path to the SQLite database file
- * @returns {Database} - SQLite database instance
+ * @returns {Database|import('@libsql/client').Client} - Database instance
  */
-function initDB(dbPath) {
-  // Ensure the data directory exists
+function initDB(dbPath = process.env.DB_PATH || './data/pets.db') {
+  if (isTursoEnabled()) {
+    const client = getTursoClient();
+    ensurePetsTable().catch((error) => {
+      console.error('❌ Failed to initialize Turso schema:', error.message);
+    });
+    return client;
+  }
+
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  db = new Database(dbPath);
+  if (!db) {
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
 
-  // Enable WAL mode for better performance
-  db.pragma('journal_mode = WAL');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pets (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('dog', 'cat', 'bird', 'rabbit', 'hamster', 'fish', 'mouse')),
+        breed TEXT DEFAULT '',
+        weight REAL NOT NULL CHECK(weight > 0),
+        activity TEXT NOT NULL CHECK(activity IN ('low', 'medium', 'high')),
+        water_ml REAL NOT NULL,
+        food_g REAL NOT NULL,
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    `);
 
-  const VALID_PET_TYPES = ['dog', 'cat', 'bird', 'rabbit', 'hamster', 'fish', 'mouse'];
+    const columns = db.prepare('PRAGMA table_info(pets)').all();
+    const hasBreedColumn = columns.some((column) => column.name === 'breed');
 
-  // Create pets table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS pets (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('dog', 'cat', 'bird', 'rabbit', 'hamster', 'fish', 'mouse')),
-      breed TEXT DEFAULT '',
-      weight REAL NOT NULL CHECK(weight > 0),
-      activity TEXT NOT NULL CHECK(activity IN ('low', 'medium', 'high')),
-      water_ml REAL NOT NULL,
-      food_g REAL NOT NULL,
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
-    )
-  `);
-
-  const columns = db.prepare('PRAGMA table_info(pets)').all();
-  const hasBreedColumn = columns.some((column) => column.name === 'breed');
-
-  if (!hasBreedColumn) {
-    db.exec("ALTER TABLE pets ADD COLUMN breed TEXT DEFAULT ''");
+    if (!hasBreedColumn) {
+      db.exec("ALTER TABLE pets ADD COLUMN breed TEXT DEFAULT ''");
+    }
   }
 
   return db;
 }
 
-/**
- * Get all pets ordered by newest first
- * @returns {Array} - List of all pet records
- */
-function getAllPets() {
+async function getAllPets() {
+  if (isTursoEnabled()) {
+    await ensurePetsTable();
+    const result = await getTursoClient().execute('SELECT * FROM pets ORDER BY created_at DESC');
+    return result.rows || [];
+  }
+
   const stmt = db.prepare('SELECT * FROM pets ORDER BY created_at DESC');
   return stmt.all();
 }
 
-/**
- * Add a new pet record
- * @param {Object} pet - Pet data { id, name, type, weight, activity, water_ml, food_g }
- * @returns {Object} - Insert result info
- */
-function addPet(pet) {
+async function addPet(pet) {
+  if (isTursoEnabled()) {
+    await ensurePetsTable();
+    await getTursoClient().execute({
+      sql: `
+        INSERT INTO pets (id, name, type, breed, weight, activity, water_ml, food_g)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [pet.id, pet.name, pet.type, pet.breed || '', pet.weight, pet.activity, pet.water_ml, pet.food_g]
+    });
+    return { changes: 1 };
+  }
+
   const stmt = db.prepare(`
     INSERT INTO pets (id, name, type, breed, weight, activity, water_ml, food_g)
     VALUES (@id, @name, @type, @breed, @weight, @activity, @water_ml, @food_g)
@@ -75,21 +139,38 @@ function addPet(pet) {
   return stmt.run(pet);
 }
 
-/**
- * Delete a pet record by ID
- * @param {string} id - Pet UUID
- * @returns {Object} - Delete result info (changes: number of rows deleted)
- */
-function deletePet(id) {
+async function deletePet(id) {
+  if (isTursoEnabled()) {
+    await ensurePetsTable();
+    const result = await getTursoClient().execute({
+      sql: 'DELETE FROM pets WHERE id = ?',
+      args: [id]
+    });
+    return { changes: result.rowsAffected || 0 };
+  }
+
   const stmt = db.prepare('DELETE FROM pets WHERE id = ?');
   return stmt.run(id);
 }
 
-/**
- * Get summary statistics
- * @returns {Object} - { totalPets, totalWater, totalFood }
- */
-function getSummary() {
+async function getSummary() {
+  if (isTursoEnabled()) {
+    await ensurePetsTable();
+    const result = await getTursoClient().execute(`
+      SELECT
+        COUNT(*) as totalPets,
+        COALESCE(SUM(water_ml), 0) as totalWater,
+        COALESCE(SUM(food_g), 0) as totalFood
+      FROM pets
+    `);
+    const row = result.rows[0] || { totalPets: 0, totalWater: 0, totalFood: 0 };
+    return {
+      totalPets: Number(row.totalPets || 0),
+      totalWater: Number(row.totalWater || 0),
+      totalFood: Number(row.totalFood || 0)
+    };
+  }
+
   const stmt = db.prepare(`
     SELECT 
       COUNT(*) as totalPets,
@@ -100,21 +181,17 @@ function getSummary() {
   return stmt.get();
 }
 
-/**
- * Close the database connection
- */
 function closeDB() {
   if (db) {
     db.close();
+    db = null;
   }
+
+  tursoClient = null;
 }
 
-/**
- * Get the database instance (for testing)
- * @returns {Database} - SQLite database instance
- */
 function getDB() {
-  return db;
+  return isTursoEnabled() ? getTursoClient() : db;
 }
 
 module.exports = {
@@ -124,5 +201,6 @@ module.exports = {
   deletePet,
   getSummary,
   closeDB,
-  getDB
+  getDB,
+  isTursoEnabled
 };
