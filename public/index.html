@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Pet Hydro-Feed Calculator — ระบบคำนวณปริมาณน้ำและอาหารสัตว์เลี้ยงประจำวัน ตามน้ำหนักตัวและระดับกิจกรรม">
+  <title>Pet Hydro-Feed Calculator 🐾</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans Thai', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen font-sans text-white">
+
+  <!-- ===== Animated Background ===== -->
+  <div class="bg-gradient" aria-hidden="true">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+  </div>
+
+  <!-- ===== Main Container ===== -->
+  <div class="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+    <!-- ===== Header ===== -->
+    <header class="text-center mb-10 animate-fade-in">
+      <div class="inline-flex items-center gap-3 mb-3">
+        <span class="text-5xl">🐾</span>
+        <h1 class="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-violet-300 via-purple-200 to-fuchsia-300 bg-clip-text text-transparent">
+          Pet Hydro-Feed Calculator
+        </h1>
+      </div>
+      <p class="text-violet-300/80 text-lg">คำนวณปริมาณน้ำและอาหารสัตว์เลี้ยงประจำวัน</p>
+    </header>
+
+    <!-- ===== Dashboard Summary Cards ===== -->
+    <section id="dashboard" class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-10 animate-slide-up" aria-label="Dashboard Summary">
+
+      <!-- Card: Total Pets -->
+      <div class="glass-card group hover:scale-[1.03] transition-all duration-300">
+        <div class="flex items-center gap-4">
+          <div class="card-icon bg-violet-500/20 text-violet-300">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-violet-300/70 uppercase tracking-wider font-medium">สัตว์เลี้ยงทั้งหมด</p>
+            <p id="summary-total-pets" class="text-3xl font-bold text-white mt-1">0</p>
+            <p class="text-xs text-violet-400/50">ตัว</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: Total Water -->
+      <div class="glass-card group hover:scale-[1.03] transition-all duration-300">
+        <div class="flex items-center gap-4">
+          <div class="card-icon bg-sky-500/20 text-sky-300">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c-4.97 4.97-7 8.03-7 11a7 7 0 1014 0c0-2.97-2.03-6.03-7-11z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-sky-300/70 uppercase tracking-wider font-medium">น้ำรวมทั้งหมด</p>
+            <p id="summary-total-water" class="text-3xl font-bold text-white mt-1">0</p>
+            <p class="text-xs text-sky-400/50">มิลลิลิตร/วัน</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: Total Food -->
+      <div class="glass-card group hover:scale-[1.03] transition-all duration-300">
+        <div class="flex items-center gap-4">
+          <div class="card-icon bg-amber-500/20 text-amber-300">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-amber-300/70 uppercase tracking-wider font-medium">อาหารรวมทั้งหมด</p>
+            <p id="summary-total-food" class="text-3xl font-bold text-white mt-1">0</p>
+            <p class="text-xs text-amber-400/50">กรัม/วัน</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===== Main Content Grid ===== -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+      <!-- ===== Input Form (Left) ===== -->
+      <section class="lg:col-span-2 animate-slide-up" style="animation-delay: 0.1s;">
+        <div class="glass-card">
+          <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <span class="text-2xl">📝</span> เพิ่มข้อมูลสัตว์เลี้ยง
+          </h2>
+
+          <form id="pet-form" novalidate>
+            <!-- Pet Name -->
+            <div class="form-group">
+              <label for="pet-name" class="form-label">ชื่อสัตว์เลี้ยง</label>
+              <input
+                type="text"
+                id="pet-name"
+                class="form-input"
+                placeholder="เช่น มีโก้, น้องหมา"
+                autocomplete="off"
+              >
+              <p id="error-name" class="error-message hidden">กรุณากรอกชื่อสัตว์เลี้ยง</p>
+            </div>
+
+            <!-- Pet Type -->
+            <div class="form-group">
+              <label for="pet-type" class="form-label">ประเภทสัตว์เลี้ยง</label>
+              <select id="pet-type" class="form-input">
+                <option value="">— เลือกประเภท —</option>
+                <option value="dog">🐕 สุนัข (Dog)</option>
+                <option value="cat">🐈 แมว (Cat)</option>
+                <option value="bird">🐦 นก (Bird)</option>
+                <option value="rabbit">🐇 กระต่าย (Rabbit)</option>
+                <option value="hamster">🐹 หนูแฮมสเตอร์ (Hamster)</option>
+                <option value="fish">🐟 ปลา (Fish)</option>
+                <option value="mouse">🐭 หนู (Mouse)</option>
+              </select>
+              <p id="error-type" class="error-message hidden">กรุณาเลือกประเภทสัตว์เลี้ยง</p>
+            </div>
+
+            <!-- Breed -->
+            <div class="form-group">
+              <label for="pet-breed" class="form-label">สายพันธุ์ / พันธุ์ (ถ้ามี)</label>
+              <input
+                type="text"
+                id="pet-breed"
+                class="form-input"
+                placeholder="เช่น แมวเปอร์เซีย, สุนัขโกลเดนรีทรีฟเวอร์, นกแก้วไทย"
+                autocomplete="off"
+              >
+            </div>
+
+            <!-- Weight -->
+            <div class="form-group">
+              <label for="pet-weight" class="form-label">น้ำหนัก (กิโลกรัม)</label>
+              <input
+                type="number"
+                id="pet-weight"
+                class="form-input"
+                placeholder="เช่น 10"
+                min="0.1"
+                step="0.1"
+              >
+              <p id="error-weight" class="error-message hidden">กรุณากรอกน้ำหนักที่มากกว่า 0</p>
+            </div>
+
+            <!-- Activity Level -->
+            <div class="form-group">
+              <label for="pet-activity" class="form-label">ระดับกิจกรรม</label>
+              <select id="pet-activity" class="form-input">
+                <option value="">— เลือกระดับ —</option>
+                <option value="low">🟢 น้อย (Low) — ×1.0</option>
+                <option value="medium">🟡 ปานกลาง (Medium) — ×1.2</option>
+                <option value="high">🔴 สูง (High) — ×1.4</option>
+              </select>
+              <p id="error-activity" class="error-message hidden">กรุณาเลือกระดับกิจกรรม</p>
+            </div>
+
+            <!-- Real-time Preview -->
+            <div id="preview-box" class="preview-box hidden">
+              <h3 class="text-sm font-semibold text-violet-300 mb-2 uppercase tracking-wider">ผลคำนวณเบื้องต้น</h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="text-center p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                  <p class="text-xs text-sky-300/70">💧 น้ำ</p>
+                  <p id="preview-water" class="text-xl font-bold text-sky-200">0 ml</p>
+                </div>
+                <div class="text-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <p class="text-xs text-amber-300/70">🍖 อาหาร</p>
+                  <p id="preview-food" class="text-xl font-bold text-amber-200">0 g</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button
+              type="submit"
+              id="btn-submit"
+              class="btn-primary w-full mt-6"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              บันทึกข้อมูล
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ===== History Table (Right) ===== -->
+      <section class="lg:col-span-3 animate-slide-up" style="animation-delay: 0.2s;">
+        <div class="glass-card">
+          <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <span class="text-2xl">📋</span> ประวัติการบันทึก
+          </h2>
+
+          <!-- Empty State -->
+          <div id="empty-state" class="text-center py-12">
+            <span class="text-6xl block mb-4">🐾</span>
+            <p class="text-violet-300/60 text-lg">ยังไม่มีข้อมูลสัตว์เลี้ยง</p>
+            <p class="text-violet-400/40 text-sm mt-1">เพิ่มข้อมูลจากฟอร์มด้านซ้าย</p>
+          </div>
+
+          <!-- Table Container -->
+          <div id="table-container" class="hidden overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-white/10">
+                  <th class="table-head">ชื่อ</th>
+                  <th class="table-head">ประเภท</th>
+                  <th class="table-head text-right">น้ำหนัก</th>
+                  <th class="table-head">กิจกรรม</th>
+                  <th class="table-head text-right">💧 น้ำ</th>
+                  <th class="table-head text-right">🍖 อาหาร</th>
+                  <th class="table-head text-center">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="pets-table-body">
+                <!-- Rows inserted by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ===== Footer ===== -->
+    <footer class="text-center mt-12 text-violet-400/40 text-sm animate-fade-in" style="animation-delay: 0.4s;">
+      <p>Pet Hydro-Feed Calculator © 2026 — Built with 💜 for Pet Lovers</p>
+    </footer>
+
+  </div>
+
+  <!-- ===== Toast Notification Container ===== -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+  <!-- ===== Floating AI Chat Launcher ===== -->
+  <div id="ai-chat-fab" class="facebook-chat-fab" aria-label="เปิดแชท Pet Advisor AI" title="Pet Advisor AI">
+    <span>🤖</span>
+  </div>
+
+  <div id="ai-chat-panel" class="facebook-chat-panel hidden" aria-live="polite">
+    <div class="facebook-chat-header">
+      <div class="facebook-chat-avatar">AI</div>
+      <div>
+        <h2>Pet Advisor AI</h2>
+        <p>ออนไลน์ · เฉพาะสัตว์เลี้ยงและ Pet Hydro-Feed Calculator</p>
+      </div>
+      <button id="ai-chat-close" class="facebook-chat-close" aria-label="ปิดแชท">×</button>
+    </div>
+
+    <div id="ai-chat-messages" class="facebook-chat-body">
+      <div class="facebook-chat-bubble bot">
+        สวัสดีครับ ผมเป็น Pet Advisor AI คอยช่วยเรื่องอาหาร ยี่ห้อ ของเล่น และคำแนะนำด้านสัตว์เลี้ยง รวมถึงการใช้งาน Pet Hydro-Feed Calculator เท่านั้น หากคำถามไม่เกี่ยวข้อง ผมจะปฏิเสธเพื่อให้คุ้มกับขอบเขตที่ทำอยู่ครับ
+      </div>
+    </div>
+
+    <div class="facebook-chat-chip-row">
+      <button class="facebook-ai-chip" data-question="สุนัขควรกินอาหารอะไรดี">🐕 อาหารสุนัข</button>
+      <button class="facebook-ai-chip" data-question="แมวควรมีของเล่นอะไรดี">🐈 ของเล่นแมว</button>
+      <button class="facebook-ai-chip" data-question="สัตว์เลี้ยงมีอาการท้องเสียให้ทำยังไง">💩 ปัญหาสุขภาพ</button>
+      <button class="facebook-ai-chip" data-question="Pet Hydro-Feed Calculator คำนวณยังไง">📊 วิธีใช้แอป</button>
+    </div>
+
+    <form id="ai-chat-form" class="facebook-chat-form">
+      <input
+        id="ai-chat-input"
+        type="text"
+        class="facebook-chat-input"
+        placeholder="พิมพ์คำถามเรื่องสัตว์เลี้ยงหรือแอป"
+        autocomplete="off"
+      >
+      <button type="submit" class="facebook-send-btn">ส่ง</button>
+    </form>
+  </div>
+
+  <!-- App Script -->
+  <script src="chatAdvisor.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
