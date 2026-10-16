@@ -51,15 +51,78 @@ const ACTIVITY_MULTIPLIER = {
   high: 1.4
 };
 
+// Realistic weight limits per pet species (kg)
+const PET_WEIGHT_LIMITS = {
+  dog: { min: 0.5, max: 100, label: '0.5 - 100 kg' },
+  cat: { min: 0.3, max: 20, label: '0.3 - 20 kg' },
+  rabbit: { min: 0.3, max: 12, label: '0.3 - 12 kg' },
+  bird: { min: 0.01, max: 3, label: '0.01 - 3 kg (10g - 3,000g)' },
+  hamster: { min: 0.01, max: 0.4, label: '0.01 - 0.4 kg (10g - 400g)' },
+  mouse: { min: 0.01, max: 0.8, label: '0.01 - 0.8 kg (10g - 800g)' },
+  fish: { min: 0.001, max: 5, label: '0.001 - 5 kg (1g - 5,000g)' }
+};
+
 /**
- * Calculate water and food requirements
+ * Calculate water and food requirements according to species reality
  * @param {number} weight - Pet weight in kg
  * @param {string} activity - Activity level: 'low', 'medium', 'high'
+ * @param {string} [type='dog'] - Pet type: 'dog', 'cat', 'bird', 'rabbit', 'hamster', 'fish', 'mouse'
  * @returns {Object} - { water_ml, food_g }
  */
-function calculateRequirements(weight, activity) {
-  const water_ml = weight * 60;
-  const food_g = weight * 18 * (ACTIVITY_MULTIPLIER[activity] || 1.0);
+function calculateRequirements(weight, activity, type = 'dog') {
+  const mult = ACTIVITY_MULTIPLIER[activity] || 1.0;
+  let water_ml = 0;
+  let food_g = 0;
+
+  switch (type) {
+    case 'dog':
+      // Dogs: ~60 ml/kg water, ~18 g/kg food * activity
+      water_ml = weight * 60;
+      food_g = weight * 18 * mult;
+      break;
+
+    case 'cat':
+      // Cats: ~50 ml/kg water, ~15 g/kg dry food * activity
+      water_ml = weight * 50;
+      food_g = weight * 15 * mult;
+      break;
+
+    case 'rabbit':
+      // Rabbits: high water requirement ~100 ml/kg, ~25 g/kg pellets/greens * activity
+      water_ml = weight * 100;
+      food_g = weight * 25 * mult;
+      break;
+
+    case 'bird':
+      // Birds: ~50 ml/kg water, seed/pellet ~10-12% of body weight (approx 100-120 g/kg)
+      water_ml = weight * 50;
+      food_g = weight * 100 * mult;
+      break;
+
+    case 'hamster':
+      // Hamsters: ~100 ml/kg water, ~100-120 g/kg food (~10-12g food per 100g hamster)
+      water_ml = weight * 100;
+      food_g = weight * 110 * mult;
+      break;
+
+    case 'mouse':
+      // Mice/Rats: ~120 ml/kg water, ~120-150 g/kg food
+      water_ml = weight * 120;
+      food_g = weight * 130 * mult;
+      break;
+
+    case 'fish':
+      // Fish: lives in water (0 ml additional drinking water), daily feed ~2% of body weight (20 g/kg)
+      water_ml = 0;
+      food_g = weight * 20 * mult;
+      break;
+
+    default:
+      water_ml = weight * 60;
+      food_g = weight * 18 * mult;
+      break;
+  }
+
   return {
     water_ml: Math.round(water_ml * 100) / 100,
     food_g: Math.round(food_g * 100) / 100
@@ -84,6 +147,11 @@ function validatePetInput(body) {
   }
   if (weight === undefined || weight === null || typeof weight !== 'number' || weight <= 0) {
     errors.push('Weight must be greater than 0');
+  } else if (type && PET_WEIGHT_LIMITS[type]) {
+    const limits = PET_WEIGHT_LIMITS[type];
+    if (weight < limits.min || weight > limits.max) {
+      errors.push(`Weight for ${type} must be between ${limits.label}`);
+    }
   }
   if (!activity || !['low', 'medium', 'high'].includes(activity)) {
     errors.push('Activity level must be "low", "medium", or "high"');
@@ -176,7 +244,7 @@ app.post('/api/ai/advice', async (req, res) => {
  * Calculate water & food requirements (preview only, no save)
  */
 app.post('/api/calculate', (req, res) => {
-  const { weight, activity } = req.body;
+  const { weight, activity, type = 'dog' } = req.body;
 
   // Validate weight
   if (weight === undefined || weight === null || typeof weight !== 'number' || weight <= 0) {
@@ -194,7 +262,7 @@ app.post('/api/calculate', (req, res) => {
     });
   }
 
-  const result = calculateRequirements(weight, activity);
+  const result = calculateRequirements(weight, activity, type);
 
   res.json({
     success: true,
@@ -235,7 +303,7 @@ app.post('/api/pets', async (req, res) => {
 
   try {
     const { name, type, weight, activity, breed } = req.body;
-    const { water_ml, food_g } = calculateRequirements(weight, activity);
+    const { water_ml, food_g } = calculateRequirements(weight, activity, type);
     const trimmedBreed = typeof breed === 'string' ? breed.trim() : '';
 
     const pet = {
@@ -325,6 +393,7 @@ module.exports = {
   app,
   calculateRequirements,
   ACTIVITY_MULTIPLIER,
+  PET_WEIGHT_LIMITS,
   VALID_PET_TYPES,
   validatePetInput
 };

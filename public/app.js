@@ -30,12 +30,69 @@
     mouse: '🐭 หนู'
   };
 
+  const PET_WEIGHT_LIMITS = {
+    dog: { min: 0.5, max: 100, label: '0.5 - 100 kg' },
+    cat: { min: 0.3, max: 20, label: '0.3 - 20 kg' },
+    rabbit: { min: 0.3, max: 12, label: '0.3 - 12 kg' },
+    bird: { min: 0.01, max: 3, label: '0.01 - 3 kg (10g - 3,000g)' },
+    hamster: { min: 0.01, max: 0.4, label: '0.01 - 0.4 kg (10g - 400g)' },
+    mouse: { min: 0.01, max: 0.8, label: '0.01 - 0.8 kg (10g - 800g)' },
+    fish: { min: 0.001, max: 5, label: '0.001 - 5 kg (1g - 5,000g)' }
+  };
+
+  function calculateRequirementsClient(weight, activity, type) {
+    const mult = ACTIVITY_MULTIPLIER[activity] || 1.0;
+    let water_ml = 0;
+    let food_g = 0;
+
+    switch (type) {
+      case 'dog':
+        water_ml = weight * 60;
+        food_g = weight * 18 * mult;
+        break;
+      case 'cat':
+        water_ml = weight * 50;
+        food_g = weight * 15 * mult;
+        break;
+      case 'rabbit':
+        water_ml = weight * 100;
+        food_g = weight * 25 * mult;
+        break;
+      case 'bird':
+        water_ml = weight * 50;
+        food_g = weight * 100 * mult;
+        break;
+      case 'hamster':
+        water_ml = weight * 100;
+        food_g = weight * 110 * mult;
+        break;
+      case 'mouse':
+        water_ml = weight * 120;
+        food_g = weight * 130 * mult;
+        break;
+      case 'fish':
+        water_ml = 0;
+        food_g = weight * 20 * mult;
+        break;
+      default:
+        water_ml = weight * 60;
+        food_g = weight * 18 * mult;
+        break;
+    }
+
+    return {
+      water_ml: Math.round(water_ml * 100) / 100,
+      food_g: Math.round(food_g * 100) / 100
+    };
+  }
+
   // ===== DOM Elements =====
   const form = document.getElementById('pet-form');
   const nameInput = document.getElementById('pet-name');
   const typeInput = document.getElementById('pet-type');
   const breedInput = document.getElementById('pet-breed');
   const weightInput = document.getElementById('pet-weight');
+  const weightHint = document.getElementById('weight-hint');
   const activityInput = document.getElementById('pet-activity');
   const btnSubmit = document.getElementById('btn-submit');
 
@@ -133,9 +190,18 @@
 
     // Weight validation
     const weight = parseFloat(weightInput.value);
+    const selectedType = typeInput.value;
     if (!weightInput.value || isNaN(weight) || weight <= 0) {
+      errorWeight.textContent = 'กรุณากรอกน้ำหนักที่มากกว่า 0';
       showError(weightInput, errorWeight);
       isValid = false;
+    } else if (selectedType && PET_WEIGHT_LIMITS[selectedType]) {
+      const limits = PET_WEIGHT_LIMITS[selectedType];
+      if (weight < limits.min || weight > limits.max) {
+        errorWeight.textContent = `น้ำหนักสำหรับ${TYPE_LABELS[selectedType] || selectedType} ควรอยู่ในช่วง ${limits.label}`;
+        showError(weightInput, errorWeight);
+        isValid = false;
+      }
     }
 
     // Activity validation
@@ -153,13 +219,13 @@
   function updatePreview() {
     const weight = parseFloat(weightInput.value);
     const activity = activityInput.value;
+    const type = typeInput.value || 'dog';
 
     if (weight > 0 && activity && ACTIVITY_MULTIPLIER[activity] !== undefined) {
-      const waterMl = weight * 60;
-      const foodG = weight * 18 * ACTIVITY_MULTIPLIER[activity];
+      const { water_ml, food_g } = calculateRequirementsClient(weight, activity, type);
 
-      previewWater.textContent = `${formatNumber(waterMl)} ml`;
-      previewFood.textContent = `${formatNumber(foodG)} g`;
+      previewWater.textContent = type === 'fish' ? '0 ml (อยู่ในน้ำ)' : `${formatNumber(water_ml)} ml`;
+      previewFood.textContent = `${formatNumber(food_g)} g`;
       previewBox.classList.remove('hidden');
     } else {
       previewBox.classList.add('hidden');
@@ -470,13 +536,34 @@
     await savePet(petData);
   });
 
-  // Real-time preview on weight/activity change
+  function updateWeightHint() {
+    const selectedType = typeInput.value;
+    if (selectedType && PET_WEIGHT_LIMITS[selectedType]) {
+      const limits = PET_WEIGHT_LIMITS[selectedType];
+      if (weightHint) {
+        weightHint.textContent = `เกณฑ์แนะนำ: ${limits.label}`;
+      }
+      weightInput.placeholder = `เช่น ${limits.min >= 1 ? limits.min * 2 : limits.min * 5}`;
+    } else {
+      if (weightHint) weightHint.textContent = '';
+      weightInput.placeholder = 'เช่น 10';
+    }
+  }
+
+  // Real-time preview on type/weight/activity change
+  typeInput.addEventListener('change', () => {
+    updateWeightHint();
+    clearError(typeInput, errorType);
+    if (weightInput.value) {
+      validateForm();
+    }
+    updatePreview();
+  });
   weightInput.addEventListener('input', updatePreview);
   activityInput.addEventListener('change', updatePreview);
 
   // Clear errors on input
   nameInput.addEventListener('input', () => clearError(nameInput, errorName));
-  typeInput.addEventListener('change', () => clearError(typeInput, errorType));
   weightInput.addEventListener('input', () => {
     clearError(weightInput, errorWeight);
     updatePreview();

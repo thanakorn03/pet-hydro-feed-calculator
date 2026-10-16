@@ -161,16 +161,19 @@
 
             <!-- Weight -->
             <div class="form-group">
-              <label for="pet-weight" class="form-label">น้ำหนัก (กิโลกรัม)</label>
+              <div class="flex justify-between items-baseline">
+                <label for="pet-weight" class="form-label">น้ำหนัก (กิโลกรัม)</label>
+                <span id="weight-hint" class="text-xs text-violet-300/80"></span>
+              </div>
               <input
                 type="number"
                 id="pet-weight"
                 class="form-input"
                 placeholder="เช่น 10"
-                min="0.1"
-                step="0.1"
+                min="0.001"
+                step="any"
               >
-              <p id="error-weight" class="error-message hidden">กรุณากรอกน้ำหนักที่มากกว่า 0</p>
+              <p id="error-weight" class="error-message hidden">กรุณากรอกน้ำหนักที่ถูกต้อง</p>
             </div>
 
             <!-- Activity Level -->
