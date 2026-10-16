@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pet-hydro-feed-calculator
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8100}:${PORT:-8100}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:-8100}
+      - DB_PATH=/app/data/pets.db
+    volumes:
+      - ./data:/app/data
